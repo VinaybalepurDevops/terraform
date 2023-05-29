@@ -1,0 +1,304 @@
+For setting up the VPC use vpc.tf. This does the following things -
+1. Create the VPC
+2. Create public and private subnet
+3. Create Elastic ip and attach to IGW
+4. Create NAT gateway attached to private subnet
+5. Create and attach public and private route tables
+6. Creation of ssh from anywhere
+
+Terraform is used to automate the infra set up process.
+The same manual process has to be followed for the automation
+Creation of VPC manually
+    1. Login to AWS console
+    2. Provide VPC cidr (Mandatory) and name (Optional)
+
+Creation of VPC using Terraform
+    1. Create EC2 machine and create AWSAdmin IAM role. Attach it to the EC2 instance. This is authentication step
+    2. Install Terraform on the EC2 instance. Verify using terraform -v
+    3. Create a directory terraform and inside the folder create a file provider.tf All the files in terraform 
+        will end with tf
+    4. Create a file called provider.tf and inside we will have provider and region details
+        terraform {
+            required_providers {
+                aws = {
+                    source  = "hashicorp/aws"
+                    version = "~> 4.0"
+                }
+            }
+        }
+
+        # Configure the AWS Provider
+        provider "aws" {
+            region = "us-east-1"
+        }
+    5. Next step is to add cidr details. This is the only mandatory value to be provided for creating VPC. 
+    6. Create another file vpc.tf. This is not mandatory, as we can add the details to provider.tf file itself.
+    7. In the VPC file add the following details
+        resource "aws_vpc" "main" {
+            cidr_block = "10.0.0.0/16"
+            tags = {
+                Name = "main"
+            }
+        }
+    8. In the above statement we have added cidr_block details and also the name of the vpc as main. Tags are
+    used to specify more details for VPC such as name. 
+        * resource - This is the keyword for Terraform to understand we are creating a resource
+        * aws_vpc - This is the type of resource we want terraform to create
+        * main - This is the name of the resource. This can be changed to any value. But remember to change the
+                 name in the tag section as well.
+        The resource name is a combinatiom of resourceType.name - aws_vpc.main
+    
+        resource "aws_vpc" "main" {
+            cidr_block = "10.0.0.0/16"
+            tags = {
+                Name = "main"
+            }
+        }
+
+        resource "aws_vpc" "main" {
+            cidr_block = "10.0.0.0/16"
+            tags = {
+                Name = "main"
+            }
+        }
+        Error: Duplicate resource "aws_vpc" configuration
+        Since there are two resources with same name, we will get an duplicate resource error
+
+        resource "aws_vpc" "main" {
+        cidr_block = "10.0.0.0/16"
+        tags = {
+            Name = "main"
+        }
+    }
+
+         resource "aws_vpc" "main1" {
+        cidr_block = "10.0.0.0/16"
+        tags = {
+            Name = "main1"
+        }
+    }
+
+    Since the name has changed to main1, there will no error and we get both the VPC created
+
+    resource "aws_vpc" "main" {
+            cidr_block = "10.10.0.0/16"
+            tags = {
+                Name = "main"
+            }
+        }
+    Since AWS does not allow the CIDR to be changed manually, if we try to update the cidr for existing resource
+    in terraform, we will get the following error - 
+    ~ cidr_block  = "10.0.0.0/16" -> "10.10.0.0/16" # forces replacement
+    Terraform allows us to change the cidr by destroying the existing VPC and creating new VPC
+    Plan: 1 to add, 0 to change, 1 to destroy.
+
+
+    9. Run the command terraform init . This will install all the libraries required to run terraform
+    10. In terraform there will be two states - Current and desired state. Current is the current state of the
+        AWS. Desired state will be what is required. Ex. When we start in the beginning, there is no VPC once 
+        we run this command we will have new VPC created
+    11. To get the current state VS desired state difference, run terraform plan command, inside the folder where
+        we have provider.tf file.
+    12. provider.tf has all the provider details and vpc.tf has all the vpc details.
+    13. Once we have the output of terraform plan, run terraform apply command 
+
+
+Creation of Subnet
+    1. Subnet creation manually needs the vpc ID and cidr block. This has to be passed to the terraform
+
+#Cretion of VPC
+    resource "aws_vpc" "main" {
+        cidr_block = "10.0.0.0/16"
+        tags = {
+            Name = "main"
+        }
+}
+
+#Attaching the subnet to the created VPC
+resource "aws_subnet" "main" {
+  vpc_id     = aws_vpc.main.id
+  cidr_block = "10.0.1.0/24"
+
+  tags = {
+    Name = "main_subnet"
+  }
+}
+
+Name of the subnet is aws_vpc.main. Using this we need to pass the vpc id. Specify the cidr block(Mandatory)
+and name of the subnet(Optional) details
+
+
+Creation of 2 public and 2 private subnet attached to same vpc
+
+#Creation of VPC
+resource "aws_vpc" "main" {
+        cidr_block = "10.0.0.0/16"
+        tags = {
+            Name = "main"
+        }
+}
+
+#Creation of subnet. Specify the availability_zone where the subnet has to be created
+resource "aws_subnet" "public-subnet1" {
+  vpc_id     = aws_vpc.main.id
+  cidr_block = "10.0.1.0/24"
+  availability_zone = "us-east-1a"
+  tags = {
+    Name = "public-subnet1"
+  }
+}
+
+resource "aws_subnet" "public-subnet2" {
+  vpc_id     = aws_vpc.main.id
+  cidr_block = "10.0.2.0/24"
+  availability_zone = "us-east-1b"
+
+  tags = {
+    Name = "public-subnet2"
+  }
+}
+
+resource "aws_subnet" "private-subnet1" {
+  vpc_id     = aws_vpc.main.id
+  cidr_block = "10.0.3.0/24"
+  availability_zone = "us-east-1a"
+  tags = {
+    Name = "private-subnet1"
+  }
+}
+resource "aws_subnet" "private-subnet2" {
+  vpc_id     = aws_vpc.main.id
+  cidr_block = "10.0.4.0/24"
+  availability_zone = "us-east-1b"
+  tags = {
+    Name = "private-subnet2"
+  }
+}
+
+#Creation of Elastic IP. Elastic IP has to be created/assigned specifically before setting up IGW.
+resource "aws_eip" "Nat-Gateway-EIP" {
+
+  depends_on = [
+    aws_subnet.private-subnet2,
+    aws_subnet.private-subnet1,
+    aws_subnet.public-subnet1,
+    aws_subnet.public-subnet2
+  ]
+  vpc = true
+}
+
+#Creation of IGW
+
+resource "aws_internet_gateway" "Internet_Gateway" {
+  depends_on = [
+    aws_subnet.private-subnet2,
+    aws_subnet.private-subnet1,
+    aws_subnet.public-subnet1,
+    aws_subnet.public-subnet2
+    aws_eip.Nat-Gateway-EIP
+  ]
+  
+  # VPC in which it has to be created!
+  vpc_id = aws_vpc.main.id
+
+  tags = {
+    Name = "IGW public subnet"
+  }
+}
+
+#Creation of new NAT gateway
+#NAT gateway is placed inside to private subnet
+resource "aws_nat_gateway" "NAT_gateway" {
+  depends_on = [
+    aws_subnet.private-subnet2,
+    aws_subnet.private-subnet1,
+    aws_subnet.public-subnet1,
+    aws_subnet.public-subnet2
+  ]
+  alloction_id = aws_internet_gateway.Internet_Gateway.id
+  subnet_id = aws_subnet.private-subnet1.id
+  tags = {
+    Name = "Nat-Gateway_Project"
+  }
+}
+
+#Public route table. Attach the public subnets to this
+resource "aws_route_table" "publicRouteTable" {
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.Internet_Gateway.id
+  }
+
+
+  tags = {
+    Name = "public Route Table"
+  }
+}
+
+#Private route table. Attach the private subnet to this
+resource "aws_route_table" "privarteRouteTable" {
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_nat_gateway.NAT_gateway.id
+  }
+
+
+  tags = {
+    Name = "private Route Table"
+  }
+}
+
+#Route table subnet association
+
+resource "aws_route_table_association" "publicsubnet1" {
+  subnet_id      = aws_subnet.public-subnet1.id
+  route_table_id = aws_route_table.publicRouteTable.id
+}
+
+resource "aws_route_table_association" "publicsubnet2" {
+  subnet_id      = aws_subnet.public-subnet2.id
+  route_table_id = aws_route_table.publicRouteTable.id
+}
+
+#Private subnet association
+resource "aws_route_table_association" "privatesubnet1" {
+  subnet_id      = aws_subnet.private-subnet1.id
+  route_table_id = aws_route_table.privarteRouteTable.id
+}
+
+resource "aws_route_table_association" "privatesubnet2" {
+  subnet_id      = aws_subnet.private-subnet2.id
+  route_table_id = aws_route_table.privarteRouteTable.id
+}
+
+
+#Creating ssh from anywhere
+
+resource "aws_security_group" "allow_ssh" {
+  name        = "allow_inbound_ssh"
+  description = "Allow ssh inbound traffic"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    description      = "TLS from VPC"
+    from_port        = 0
+    to_port          = 22
+    protocol         = "ssh"
+    cidr_blocks      = ["0.0.0.0/0"]
+    
+  }
+
+  egress {
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+  }
+
+  tags = {
+    Name = "allow_outbound_ssh"
+  }
+}
