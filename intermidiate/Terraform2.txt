@@ -1,0 +1,61 @@
+Terraform tfstate file contains all the configurations and the state of the infra. If this is not shared and if 
+multiple users are working on the infra set up, then they will override the other's work. This file is crearted
+and storted locally, where we have the tf files. We need to have a shared location for this file, so that anyone
+working on the infra will be able to set up the infra and not overwrite the existing infra. To achieve this, we
+will use S3 bucket and store this file and have reference to this location in the provider.tf file. This way any
+one who uses this file, will be able to set up the infra without overwriting the exisiting infra. To achieve this do the following
+    1. Create a AWS s3 bucket.
+    2. Use S3 backend as a service of terraform and have the following code in provider.tf file
+    3. If we create the S3 bucket using the terraform code, then the bucket will get destroyed when we run terrafom destroy command. To avoid this, we need to S3 backend service. Also if we enable versioning s3 bucket, then we can have multiple version of the tfstate file.
+
+    terraform {
+    required_providers {
+        aws = {
+                source  = "hashicorp/aws"
+                version = "~> 4.0"
+            }
+        }
+ backend "s3" {
+    bucket = "tfsfile"
+    key    = "stage/terraform.tfstate"
+    region = "us-east-1"
+  }
+    }
+
+# Configure the AWS Provider
+    provider "aws" {
+        region = "us-east-1"
+    }
+
+    4. Run terraform init. terraform apply
+
+There is a concept of state locking in teraform, which means, if we try to run the same file multiple times at the same time, we get state lock error. This ensures, no other execution happens and the infra is not screwed.
+If we use S3 storage for the tfstate file storage, there are chances two people can run the file at the same time. To avoid this we can use dynamo db for state locking across multiple instances. Do the following to achieve the above
+
+    1. In AWS create a new dyanmo db, with any name (tffiles), but the partition key has to LockID
+    2. Use this in your provider.tf file as follows
+
+    terraform {
+    required_providers {
+        aws = {
+                source  = "hashicorp/aws"
+                version = "~> 4.0"
+            }
+        }
+    backend "s3" {
+        bucket = "tfsfile"
+        key    = "stage/terraform.tfstate"
+        region = "us-east-1"
+        dynamodb_table= "tffiles"
+    }
+        }
+    # Configure the AWS Provider
+        provider "aws" {
+            region = "us-east-1"
+        }
+    3. Run terraform.init command to apply this change.
+
+    Dynamo db has primary key. If one person runs terraform commands, there is a entry in the dynamo db. If another person runs terraform command, terraform will not be able to make another entry and we get lock message. Once the run is over, the entry is removed and another person can run the terraform command.
+
+
+  

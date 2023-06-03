@@ -1,0 +1,272 @@
+Creation of ec2 instance -
+ 1. We need to have the public key created. To do this run ssh-keygen and generate the public and private key. Use the public key for the aws_key_pair
+ 2. We need to allow for ssh into the machine. Use the aws_security_group to achieve this.
+ 3. We need to have the ec2 details provided
+
+
+ #Creation of VPC
+resource "aws_vpc" "main" {
+        cidr_block = "10.0.0.0/16"
+        tags = {
+            Name = "main"
+        }
+}
+
+#Creation of subnet. Specify the availability_zone where the subnet has to be created
+resource "aws_subnet" "public-subnet1" {
+  vpc_id     = aws_vpc.main.id
+  cidr_block = "10.0.1.0/24"
+  availability_zone = "us-east-1a"
+  map_public_ip_on_launch = true
+  tags = {
+    Name = "public-subnet1"
+  }
+}
+
+resource "aws_subnet" "public-subnet2" {
+  vpc_id     = aws_vpc.main.id
+  cidr_block = "10.0.2.0/24"
+  availability_zone = "us-east-1b"
+  # This line is required to allow ssh into the ec2 server that is created
+  map_public_ip_on_launch = true
+  tags = {
+    Name = "public-subnet2"
+  }
+}
+
+resource "aws_subnet" "private-subnet1" {
+  vpc_id     = aws_vpc.main.id
+  cidr_block = "10.0.3.0/24"
+  availability_zone = "us-east-1a"
+  tags = {
+    Name = "private-subnet1"
+  }
+}
+resource "aws_subnet" "private-subnet2" {
+  vpc_id     = aws_vpc.main.id
+  cidr_block = "10.0.4.0/24"
+  availability_zone = "us-east-1b"
+  tags = {
+    Name = "private-subnet2"
+  }
+}
+
+# This is the sleeper which allows us to wait for a activity to be completed. We can use this as part of 
+# dependency block where we require the code to wait for the build to complete
+resource "time_sleep" "wait_30_seconds" {
+
+  create_duration = "30s"
+}
+
+#Creation of Elastic IP. Elastic IP has to be created/assigned specifically before setting up IGW.
+resource "aws_eip" "Nat-Gateway-EIP" {
+
+  depends_on = [
+    aws_subnet.private-subnet2,
+    aws_subnet.private-subnet1,
+    aws_subnet.public-subnet1,
+    aws_subnet.public-subnet2
+  ]
+  vpc = true
+}
+
+#Creation of IGW
+
+resource "aws_internet_gateway" "Internet_Gateway" {
+  depends_on = [
+    aws_subnet.private-subnet2,
+    aws_subnet.private-subnet1,
+    aws_subnet.public-subnet1,
+    aws_subnet.public-subnet2,
+    aws_eip.Nat-Gateway-EIP,
+    time_sleep.wait_30_seconds
+ ]
+  
+  # VPC in which it has to be created!
+  vpc_id = aws_vpc.main.id
+
+  tags = {
+    Name = "IGW public subnet"
+  }
+}
+
+#Creation of new NAT gateway
+#NAT gateway is placed inside to private subnet
+
+resource "aws_nat_gateway" "NAT_gateway" {
+  depends_on = [
+    aws_subnet.private-subnet2,
+    aws_subnet.private-subnet1,
+    aws_subnet.public-subnet1,
+    aws_subnet.public-subnet2,
+    aws_eip.Nat-Gateway-EIP,
+    aws_internet_gateway.Internet_Gateway,
+    time_sleep.wait_30_seconds
+  ]
+  allocation_id = aws_eip.Nat-Gateway-EIP.id
+  subnet_id = aws_subnet.private-subnet1.id
+  tags = {
+    Name = "Nat-Gateway_Project"
+  }
+}
+
+#Public route table. Attach the public subnets to this
+
+resource "aws_route_table" "publicRouteTable" {
+  vpc_id = aws_vpc.main.id
+
+    depends_on = [
+    aws_subnet.private-subnet2,
+    aws_subnet.private-subnet1,
+    aws_subnet.public-subnet1,
+    aws_subnet.public-subnet2,
+    aws_eip.Nat-Gateway-EIP,
+    aws_nat_gateway.NAT_gateway
+  ]
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.Internet_Gateway.id
+  }
+
+
+  tags = {
+    Name = "public Route Table"
+  }
+}
+
+#Private route table. Attach the private subnet to this
+
+resource "aws_route_table" "privarteRouteTable" {
+  vpc_id = aws_vpc.main.id
+  depends_on = [
+    aws_subnet.private-subnet2,
+    aws_subnet.private-subnet1,
+    aws_subnet.public-subnet1,
+    aws_subnet.public-subnet2,
+    aws_eip.Nat-Gateway-EIP,
+    aws_nat_gateway.NAT_gateway
+  ]
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_nat_gateway.NAT_gateway.id
+  }
+
+
+  tags = {
+    Name = "private Route Table"
+  }
+}
+
+#Route table subnet association
+
+resource "aws_route_table_association" "publicsubnet1" {
+  depends_on = [
+    aws_subnet.private-subnet2,
+    aws_subnet.private-subnet1,
+    aws_subnet.public-subnet1,
+    aws_subnet.public-subnet2,
+    aws_eip.Nat-Gateway-EIP,
+    aws_nat_gateway.NAT_gateway
+  ]
+  subnet_id      = aws_subnet.public-subnet1.id
+  route_table_id = aws_route_table.publicRouteTable.id
+}
+
+resource "aws_route_table_association" "publicsubnet2" {
+  depends_on = [
+    aws_subnet.private-subnet2,
+    aws_subnet.private-subnet1,
+    aws_subnet.public-subnet1,
+    aws_subnet.public-subnet2,
+    aws_eip.Nat-Gateway-EIP,
+    aws_nat_gateway.NAT_gateway
+  ]
+  subnet_id      = aws_subnet.public-subnet2.id
+  route_table_id = aws_route_table.publicRouteTable.id
+}
+
+#Private subnet association
+
+resource "aws_route_table_association" "privatesubnet1" {
+  depends_on = [
+    aws_subnet.private-subnet2,
+    aws_subnet.private-subnet1,
+    aws_subnet.public-subnet1,
+    aws_subnet.public-subnet2,
+    aws_eip.Nat-Gateway-EIP,
+    aws_nat_gateway.NAT_gateway
+  ]
+  subnet_id      = aws_subnet.private-subnet1.id
+  route_table_id = aws_route_table.privarteRouteTable.id
+}
+
+resource "aws_route_table_association" "privatesubnet2" {
+  depends_on = [
+    aws_subnet.private-subnet2,
+    aws_subnet.private-subnet1,
+    aws_subnet.public-subnet1,
+    aws_subnet.public-subnet2,
+    aws_eip.Nat-Gateway-EIP,
+    aws_nat_gateway.NAT_gateway
+  ]
+  subnet_id      = aws_subnet.private-subnet2.id
+  route_table_id = aws_route_table.privarteRouteTable.id
+}
+
+/** There is a specific way to create the key pair. 
+    ssh-keygen -f terraform_ec2_key - Run this in the folder where you will ssh from
+    ssh into server using - ssh -i "terraform_ec2_key" ec2-user@your-ip-address
+*/
+# Key pair association
+
+ resource "aws_key_pair" "ssh-key" {
+  depends_on = [aws_route_table_association.privatesubnet2]
+  key_name   = "ssh-key"
+  # Either use the public key or the file like following
+  # public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDHgrqb6BRT7niu/PY8MomsEatka7iNKI3sOFYrwMkD2urNKmSr0PScKu1reMg/svyzDd4i+hEV28/yVTCGqi6vXjtZvt5B0b9TlRbvh/dXb6HkHH69b6nzr8MLesDtUcwZsJoQZamjgi4QP70x5TVXp0GdKTv4yTKhyOP9uhZkA5O7xhQeaYIUWQX0bAilJCvQqtLvgOIr3drUZCSvQeoM+nYUqyzmWEcpytzfH4Eo1xFtEFf9cYmXNWgUCeGDj/C0/j/evjPRSkEk1TnLWYgHD/8jHzir3jx4PbPS4J+NVPIJNGMqinHl9n0v1fK9fik/xKq0yOQ34qQmMX+KrkJONZvFrCOEW7mICRo2wLteR0v+UrR6eLOd5wQkpQdlIMdqJ4iFn7eZgv0t3lBwQksxYQHXQ7Xy1o3aDIZU2jC4l+SeZBoFEsvlSIEKXNqfofXlzVlI9bVjXqBnRWTjAFMjp3XYvVbXR5AkRE40pEW+9cLYyyvAEHFcPPaGuBIujCE= ubuntu@ip-172-31-92-226"
+  # public_key = "${file("terraform_ec2_key.pub")}"
+}
+
+# Allowing for ssh
+
+resource "aws_security_group" "allow_ssh" {
+  depends_on = [aws_key_pair.ssh-key]
+  name        = "allow_inbound_ssh"
+  description = "Allow ssh inbound traffic"
+
+  ingress {
+    description      = "SSH from anywhere"
+    from_port        = 22
+    to_port          = 22
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+
+  }
+
+  egress {
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    cidr_blocks      = ["0.0.0.0/0"]
+  }
+  vpc_id     = aws_vpc.main.id
+
+  tags = {
+    Name = "allow_ssh"
+  }
+}
+
+# Creation of ec2 instance
+
+resource "aws_instance" "web" {
+    depends_on = [aws_security_group.allow_ssh]
+    ami           = "ami-053b0d53c279acc90"
+    instance_type = "t3.micro"
+    key_name = aws_key_pair.ssh-key.key_name
+    subnet_id = aws_subnet.public-subnet1.id
+    vpc_security_group_ids = [aws_security_group.allow_ssh.id]
+    associate_public_ip_address = true
+    tags = {
+      Name = "HelloWorld"
+    }
+  }
