@@ -216,6 +216,7 @@ resource "aws_route_table_association" "privatesubnet2" {
 /** There is a specific way to create the key pair. 
     ssh-keygen -f terraform_ec2_key - Run this in the folder where you will ssh from
     ssh into server using - ssh -i "terraform_ec2_key" ec2-user@your-ip-address
+    Refer this - https://github.com/networknuts/terraform/blob/master/ec2-instance-with-ssh-keys
 */
 # Key pair association
 
