@@ -1,0 +1,110 @@
+Workspaces
+1. This is used to have different env for each of the instance such as Dev, QA, Prod env
+2. To achieve this, we need to use virtual env(Workspace) and completely parametrized tf files.
+3. Following are the commands avaialble for worskpace creation
+        delete    Delete a workspace
+        list      List Workspaces
+        new       Create a new workspace
+        select    Select a workspace
+        show      Show the name of the current workspace
+4. Creation of new work space - terraform workspace new dev
+5. terraform workspace list - Will show 2 workspaces, default and dev
+6. terraform workspace select dev - Switch to dev work space
+7. If we change the workspace from default to dev or anything to anything it will recreate the infra again in the new workspace
+8. This will create tfstate file for each of the workspace seperately
+
+                *************************************   
+Creation of vpc with workspaces
+Have a file called vpc.tf with following entries. This will be parametrized compeletly
+
+#Creation of VPC
+module "vpc" {
+  source = "terraform-aws-modules/vpc/aws"
+
+  name = var.name
+  cidr = var.cidr
+
+  azs             = ["us-east-1a", "us-east-1b"]
+  private_subnets = [var.private-subnet1, var.private-subnet2]
+  public_subnets  = [var.public-subnet1, var.public-subnet2]
+
+  enable_nat_gateway = true
+  enable_vpn_gateway = false
+
+  tags = {
+    Terraform = "true"
+    Environment = var.env
+  }
+}
+
+Have variable.tf file to update the parameters of the vpc.tf file
+
+variable "env"{
+        
+}
+
+variable "name"{
+        
+}
+
+variable "cidr"{
+
+}
+
+variable "private-subnet1"{
+
+}
+
+variable "private-subnet2"{
+
+}
+
+variable "public-subnet1"{
+
+}
+
+variable "public-subnet2"{
+        
+}
+
+
+Have different tfvars. Such as dev.tfvars, stage.tfvars
+
+dev.tfvars will have following entries
+
+env="dev"
+name="dev-vpc"
+cidr="10.0.0.0/16"
+private-subnet1="10.0.1.0/24"
+private-subnet2="10.0.2.0/24"
+public-subnet1="10.0.101.0/24"
+public-subnet2="10.0.102.0/24"
+
+stage.tfvars will have following entries
+
+env="stage"
+name="stage-vpc"
+cidr="192.168.0.0/16"
+private-subnet1="192.168.2.0/24"
+private-subnet2="192.168.3.0/24"
+public-subnet1="192.168.4.0/24"
+public-subnet2="192.168.5.0/24"
+
+Run the following commands for either stage or dev
+
+terraform workspace select dev
+terraform apply -var-file="dev.tfvars"
+
+terraform workspace select stage
+terraform apply -var-file="stage.tfvars"
+
+This approach will create 2 tfstate files in 2 different subfolders
+terraform.tfstate.d/dev/terraform.tfstate
+terraform.tfstate.d/stage/terraform.tfstate
+
+To destory use the following commands
+terraform workspace select dev
+terraform destroy -var-file="dev.tfvars"
+
+terraform workspace select stage
+terraform destroy -var-file="stage.tfvars"

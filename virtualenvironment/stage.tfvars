@@ -1,0 +1,7 @@
+env="stage"
+name="stage-vpc"
+cidr="192.168.0.0/16"
+private-subnet1="192.168.2.0/24"
+private-subnet2="192.168.3.0/24"
+public-subnet1="192.168.4.0/24"
+public-subnet2="192.168.5.0/24"
