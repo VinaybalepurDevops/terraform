@@ -1,0 +1,74 @@
+Providers and alias
+We cannot have more than one provider for the same cloud provider in the provider.tf file. To overcome
+this we can use alias in the provider.tf file and give a new value. This will help us in creating the backup
+infra
+
+provider.tf
+
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 4.0"
+    }
+  }
+}
+
+# Configure the AWS Provider
+provider "aws" {
+  region     = "us-east-1"
+  access_key = "AKIASOWEIZKOHIS5NN2Y"
+  secret_key = "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"
+}
+
+# Configure new provider block for different region
+provider "aws" {
+  alias = "backup"
+  region     = "us-west-1"
+  access_key = "AKIASOWEIZKOHIS5NN2Y"
+  secret_key = "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"
+}
+                          *********************************************
+
+Once this is created we can use the alias value while creating the infra simultaneously in both the regions.
+Ensure that provider aws.backup is provided to each component and the name is changed to make it unique.
+
+
+#Creation of VPC
+resource "aws_vpc" "main" {
+        cidr_block = "10.0.0.0/16"
+        tags = {
+            Name = "main"
+        }
+}
+
+#Creation of backup VPC
+resource "aws_vpc" "backup" {
+        provider = aws.backup
+        cidr_block = "10.0.0.0/16"
+        tags = {
+            Name = "backup"
+        }
+}
+
+#Creation of subnet
+resource "aws_subnet" "main-public-subnet1" {
+  vpc_id     = aws_vpc.main.id
+  cidr_block = "10.0.1.0/24"
+  availability_zone = "us-east-1a"
+  tags = {
+    Name = "main-public-subnet1"
+  }
+}
+
+#Creation of subnet in backup region
+resource "aws_subnet" "backup-public-subnet1" {
+  provider = aws.backup
+  vpc_id     = aws_vpc.backup.id
+  cidr_block = "10.0.1.0/24"
+  availability_zone = "us-west-1a"
+  tags = {
+    Name = "backup-public-subnet1"
+  }
+}
+
