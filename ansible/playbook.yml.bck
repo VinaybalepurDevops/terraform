@@ -1,0 +1,10 @@
+-
+  hosts: right
+  name: first play
+  tasks:
+  - name: connectivity test
+    ping:
+  - name: copying files
+    copy:
+      src: inventory
+      dest: /home/ubuntu/main.sh

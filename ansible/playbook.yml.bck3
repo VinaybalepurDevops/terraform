@@ -1,0 +1,12 @@
+-
+  hosts: right
+  name: first play
+  tasks:
+  - name: connectivity test
+    when: ansible_distribution_file_variety == "Debian"
+    ping:
+  - name: copying files
+    when: ansible_distribution_file_variety == "Debian" and ansible_os_family == "Debian"
+    copy:
+      src: inventory
+      dest: /home/ubuntu/main.sh
