@@ -1,0 +1,16 @@
+---
+- name: Creation of new user
+  hosts: right
+  become: yes
+  vars:
+   password: "test_1234"
+  tasks:
+   - user:
+      name: vinay.bp
+      password: "{{ password | password_hash('sha512') }}"
+      comment: Vinay.bp
+      uid: 1077
+      groups: 
+        - sudo
+      createhome: yes        # Defaults to yes
+      home: /home/vinay.bp

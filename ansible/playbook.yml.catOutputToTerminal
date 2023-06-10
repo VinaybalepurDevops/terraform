@@ -1,0 +1,12 @@
+-
+  hosts: right
+  name: first play
+  tasks:
+  - name: "cat etc file"
+    shell: |
+      cat /etc/hosts
+    register: cat_output
+
+  - name: "Print cat ouput"
+    debug:
+      msg: "{{ cat_output.stdout }}"

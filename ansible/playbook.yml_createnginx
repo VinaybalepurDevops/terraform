@@ -1,0 +1,16 @@
+-
+  hosts: right
+  become: yes
+  vars:
+    document_root: /var/www/html/index.html
+    app_root: index.html
+  tasks:
+    - name: ensure nginx is at the latest version
+      apt: 
+        name: nginx 
+        state: latest
+    - name: Copy new file to ngnix
+      copy:
+        src: "{{ app_root }}"
+        dest: "{{ document_root }}"
+        mode: preserve

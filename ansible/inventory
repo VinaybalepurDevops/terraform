@@ -1,2 +1,2 @@
 [right]
-172.31.81.204 ansible_ssh_user=ubuntu ansible_ssh_private_key_file="/home/ubuntu/ansible/slave.pem"
+172.31.91.4 ansible_ssh_user=ubuntu ansible_ssh_private_key_file="/home/ubuntu/terraform/ansible/slave.pem"
