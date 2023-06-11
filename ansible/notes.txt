@@ -1,0 +1,137 @@
+Ansible
+ 1. It is used for configuration managemente. It works on master node principle. 
+    It is a push based system where ther will be more pressure on master as master is responsible for performing all the activities.
+ 2. Install ansible on master and create inventory file with following details
+     PrivateIPofFirstMachine ansible_ssh_user=ubuntu ansible_ssh_private_key_file="LocationOfPemFile"
+     PrivateIPofSecondMachine ansible_ssh_user=ubuntu ansible_ssh_private_key_file="LocationOfPemFile"
+ 3. Ansible ssh's into node machines, this means the port 22 has to be open for the security group. Add the pem file value
+    which is used to login to the server to the pem file where we are running the ansible
+ 4. The inventory file can have the following
+      1. ansible_connection - ss/winrm/localhost, depending on the type of connection
+      2. ansible_port - 22/5986 or any other custom port
+      3. ansible_user - ubuntu/anyuserwithAdminAccess
+      4. ansible_password - Password to log in
+ 5. To check the ssh connectivity run the following 
+       ansible all -m ping -i inventory
+    This is called adhoc task as it is executed without play book. Adhoc tasks are easy for running simple commands. For complex commands use palybook
+       ansible all -m setup -i inventory - This gives all the server level details of the nodes
+
+Play books - 
+
+Playbooks are yml files and used to do complex activities. Example is below
+
+
+
+1. Play book is a set of tasks. Each play book can be used to run tasks on one host.
+2. If there are two hosts, such as one webserver and db server, then we use two playbooks
+3. We have the host on which the tasks have to be run and and followed by tasks.
+4. In the below play we have two tasks. One to check connectivity and the other to copy files
+5. The hosts name is right. In the inventory file have a host called right like below
+
+[right]
+172.31.81.204 ansible_ssh_user=ubuntu ansible_ssh_private_key_file="/home/ubuntu/ansible/slave.pem"
+
+-
+ hosts: right
+ name: first play
+ tasks:
+ - name: connectivity test
+   ping:
+ - name: copying files
+   copy:
+    src: inventory
+    dest: /home/ubuntu/main.sh
+
+5. In this play we will have user creation task.
+
+---
+- name: Creation of new user
+  hosts: right
+  become: yes
+  vars:
+   password: "test_1234"
+  tasks:
+   - user:
+      name: vinay.bp
+      password: "{{ password | password_hash('sha512') }}"
+      comment: Vinay.bp
+      uid: 1077
+      groups: 
+        - sudo
+      createhome: yes        # Defaults to yes
+      home: /home/vinay.bp
+
+
+6. In this play we are storing the out put of cat /etc/hosts to a variable and printing the value
+   of the variable
+-
+  hosts: right
+  name: first play
+  tasks:
+  - name: "cat etc file"
+    shell: |
+      cat /etc/hosts
+    register: cat_output
+
+  - name: "Print cat ouput"
+    debug:
+      msg: "{{ cat_output.stdout }}"
+
+Modules in ansible
+1. system - Actions to be performed at system level such as adding users, modifying ip tables.
+2. command - Used to run scripts
+3. file - update files, write and delete lines in the file
+
+print values to terminal
+-
+  hosts: right
+  name: first play
+  tasks:
+  - name: "cat etc file"
+    shell: |
+      cat /etc/hosts
+    register: cat_output
+
+  - name: "Print cat ouput"
+    debug:
+      msg: "{{ cat_output.stdout }}" 
+
+Installing nginx on nodes using modules
+
+-
+  hosts: right
+  become: yes
+  vars:
+    document_root: /var/www/html/index.html
+    app_root: index.html
+  tasks:
+    - name: ensure nginx is at the latest version
+      apt: 
+        name: nginx 
+        state: latest
+    - name: Copy new file to ngnix
+      copy:
+        src: "{{ app_root }}"
+        dest: "{{ document_root }}"
+        mode: preserve
+
+Ansible configuration file
+1. This file is located at /etc/ansible/ansible.cfg
+2. We can edit this file to allow free ssh to nodes, if we ssh to nodes for the first tme, it will
+   ask for validating the host using yes command. If we update the file with following, then this gets
+   skipped
+
+   [defaults]
+   host_key_checking = false
+
+
+Ansible Roles
+* Roles provide a framework for fully independent or interdependent collections of variables, tasks, files, templates and modules
+* Ansible roles allows for resue of modlues
+* Roles let you to automatically load related files such as var files, tasks, handlers, and other artifacts based on known file
+structure
+* They are defined using yml using predefined directory structure
+
+
+
+
