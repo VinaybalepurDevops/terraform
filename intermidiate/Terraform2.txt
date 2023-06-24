@@ -31,8 +31,10 @@ tfstate file.
 
     4. Run terraform init. terraform apply
 
-There is a concept of state locking in teraform, which means, if we try to run the same file multiple times at the same time, we get state lock error. This ensures, no other execution happens and the infra is not screwed.
-If we use S3 storage for the tfstate file storage, there are chances two people can run the file at the same time. To avoid this we can use dynamo db for state locking across multiple instances. Do the following to achieve the above
+There is a concept of state locking in teraform, which means, if we try to run the same file multiple times at the same time, we get 
+state lock error. This ensures, no other execution happens and the infra is not screwed.
+If we use S3 storage for the tfstate file storage, there are chances two people can run the file at the same time. To avoid this
+we can use dynamo db for state locking across multiple instances. Do the following to achieve the above
 
     1. In AWS create a new dyanmo db, with any name (tffiles), but the partition key has to LockID
     2. Use this in your provider.tf file as follows
