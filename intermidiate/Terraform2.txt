@@ -59,7 +59,9 @@ we can use dynamo db for state locking across multiple instances. Do the followi
         }
     3. Run terraform.init command to apply this change.
 
-    Dynamo db has primary key. If one person runs terraform commands, there is a entry in the dynamo db. If another person runs terraform command, terraform will not be able to make another entry and we get lock message. Once the run is over, the entry is removed and another person can run the terraform command.
+    Dynamo db has primary key. If one person runs terraform commands, there is a entry in the dynamo db. If another person 
+runs terraform command, terraform will not be able to make another entry and we get lock message. Once the run is over, 
+the entry is removed and another person can run the terraform command.
 
 
   
